@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  yuque-sync:
+    build: .
+    container_name: yuque-sync
+    restart: always
+    volumes:
+      - /mnt/c/Users/d5v/Documents/Obsidian/笔记/语雀:/data
+    networks:
+      - yuque-network
+
+networks:
+  yuque-network:
+    driver: bridge
