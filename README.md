@@ -5,9 +5,64 @@ YuqueSync 是一个支持语雀文档本地同步的工具，支持 Windows、Ma
 
 ❤️ 喜欢 YuqueSync? 给它一个星星 🌟 或者赞助来支持开发！
 
-# 🌠 截图展示
+# 🚀 快速开始
 
-[截图待添加]
+## Docker 运行（推荐）
+
+### 1. 获取语雀凭证
+
+1. 打开浏览器，登录语雀
+2. 按 F12 打开开发者工具
+3. 切换到 Network 标签
+4. 刷新页面，找到任意一个请求
+5. 在请求头中找到：
+   - `yuque_ctoken`: 这是你的 YUQUE_TOKEN
+   - `_yuque_session`: 这是你的 YUQUE_SESSION
+
+### 2. 运行容器
+
+```bash
+# 方式一：直接运行
+docker run -d \
+  --name yuque-sync \
+  --restart always \
+  -e YUQUE_TOKEN="你的token" \
+  -e YUQUE_SESSION="你的session" \
+  -v /path/to/save:/data \
+  yuque-sync
+
+# 方式二：使用 docker-compose
+# 1. 编辑 docker-compose.yaml 中的环境变量
+# 2. 修改 volumes 中的本地路径
+# 3. 运行：
+docker-compose up -d
+```
+
+### 3. 环境变量说明
+
+| 环境变量 | 必需 | 默认值 | 说明 |
+|---------|------|--------|------|
+| `YUQUE_TOKEN` | ✅ | - | 语雀 Token |
+| `YUQUE_SESSION` | ✅ | - | 语雀 Session |
+| `YUQUE_BASE_URL` | ❌ | `https://www.yuque.com` | 语雀网站地址 |
+| `SAVE_PATH` | ❌ | `/data` | 文档保存路径 |
+| `MONITOR_INTERVAL_MINUTES` | ❌ | `10` | 同步间隔（分钟） |
+
+## 本地运行
+
+```bash
+# 1. 安装依赖
+pip install -r requirements.txt
+
+# 2. 设置环境变量
+export YUQUE_TOKEN="你的token"
+export YUQUE_SESSION="你的session"
+export SAVE_PATH="./downloads"
+
+# 3. 运行
+python main.py download  # 单次下载
+python main.py monitor   # 持续监控
+```
 
 # 🌟 主要特性
 
@@ -26,6 +81,7 @@ YuqueSync 是一个支持语雀文档本地同步的工具，支持 Windows、Ma
    * 📦 开箱即用，无需复杂配置
    * 🎨 支持浅色/深色主题
    * 💾 文档备份功能
+   * 🐳 Docker 容器化部署
 
 # 📝 待办事项
 
@@ -39,9 +95,6 @@ YuqueSync 是一个支持语雀文档本地同步的工具，支持 Windows、Ma
 - [ ] 移动端支持
 - [ ] 数据同步支持自定义内容
 
-# 🖥️ 开发指南
-
-参考[开发文档](./docs/development.md)
 
 # 🤝 贡献指南
 

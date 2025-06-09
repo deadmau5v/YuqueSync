@@ -1,28 +1,25 @@
-from typing import Any
-import yaml
 import os
+from typing import Any
 
 def get_config() -> dict[str, Any]:
-    with open("./config.yaml", "r", encoding="utf-8") as f:
-        config_data = yaml.safe_load(f)
+    """
+    从环境变量获取配置，如果环境变量不存在则使用默认值
+    """
+    config = {
+        "yuque": {
+            "base_url": os.getenv("YUQUE_BASE_URL", "https://www.yuque.com"),
+            "token": os.getenv("YUQUE_TOKEN", ""),
+            "session": os.getenv("YUQUE_SESSION", ""),
+        },
+        "save_path": os.getenv("SAVE_PATH", "/data"),
+        "monitor_interval_minutes": int(os.getenv("MONITOR_INTERVAL_MINUTES", "10")),
+    }
     
-    # 设置默认值
-    if "monitor_interval_minutes" not in config_data:
-        config_data["monitor_interval_minutes"] = 60
-
-    return config_data
+    return config
 
 def save_config(config_data: dict[str, Any]) -> bool:
     """
-    保存配置到文件
-    
-    :param config_data: 配置数据
-    :return: 是否成功
+    环境变量模式下不支持保存配置
     """
-    try:
-        with open("./config.yaml", "w", encoding="utf-8") as f:
-            yaml.dump(config_data, f, allow_unicode=True, default_flow_style=False)
-        return True
-    except Exception as e:
-        print(f"保存配置文件失败: {e}")
-        return False
+    print("警告: 环境变量模式下不支持保存配置，请直接设置环境变量")
+    return False

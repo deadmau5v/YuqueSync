@@ -22,3 +22,8 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
