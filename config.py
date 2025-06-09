@@ -13,7 +13,13 @@ def get_config() -> dict[str, Any]:
         },
         "save_path": os.getenv("SAVE_PATH", "/data"),
         "monitor_interval_minutes": int(os.getenv("MONITOR_INTERVAL_MINUTES", "10")),
+        "export_format": os.getenv("EXPORT_FORMAT", "pdf").lower(),  # 支持 pdf 或 markdown
     }
+    
+    # 验证导出格式
+    if config["export_format"] not in ["pdf", "markdown"]:
+        print(f"警告: 不支持的导出格式 '{config['export_format']}'，将使用默认格式 'pdf'")
+        config["export_format"] = "pdf"
     
     return config
 

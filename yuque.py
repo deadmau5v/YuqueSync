@@ -13,6 +13,20 @@ import os
 logger = logging.getLogger(__name__)
 
 
+def get_file_extension(export_format: str = None) -> str:
+    """
+    根据导出格式获取文件扩展名
+    
+    :param export_format: 导出格式 ("pdf" 或 "markdown")
+    :return: 文件扩展名 (包含点号)
+    """
+    if export_format is None:
+        cfg = get_config()
+        export_format = cfg.get("export_format", "pdf")
+    
+    return ".pdf" if export_format == "pdf" else ".md"
+
+
 def sanitize_filename(title: str) -> str:
     """
     将语雀文档标题转换为合法的文件名
@@ -129,16 +143,29 @@ class Yuque:
             logger.error(f"导出文档失败，已达到最大重试次数: {book.name} - {doc.title}")
             return False
 
-        data = {
-            "force": 0,
-            "options": "{\"latexType\":1}",
-            "type": "markdown",
-        }
+        # 获取导出格式配置
+        cfg = get_config()
+        export_format = cfg.get("export_format", "pdf")
+        
+        # 根据导出格式设置请求参数
+        if export_format == "pdf":
+            data = {
+                "type": "pdf",
+                "force": 0,
+                "options": "{\"enableToc\":1}"
+            }
+        else:  # markdown
+            data = {
+                "force": 0,
+                "options": "{\"latexType\":1}",
+                "type": "markdown",
+            }
+        
         api = f"/api/docs/{doc.id}/export"
 
         try:
             url = self.base_url + api
-            # logger.info(f"正在请求导出文档: {book.name} - {doc.title}")
+            # logger.info(f"正在请求导出文档({export_format}): {book.name} - {doc.title}")
             response = self._requestSession.post(url, json=data, headers={
                 "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
                 "content-type": "application/json",
@@ -157,8 +184,6 @@ class Yuque:
 
                 logger.error(
                     f"导出请求失败，状态码: {response.status_code}，文档: {book.name} - {doc.title}")
-                # 请求失败时增加等待时间
-                # await asyncio.sleep(5)
                 return await self.docs_export(book, doc, save_path, retry=retry-1)
 
             response.raise_for_status()
@@ -168,20 +193,54 @@ class Yuque:
             if "data" not in response_data or "url" not in response_data["data"]:
                 logger.error(
                     f"导出响应格式错误: {response_data}，文档: {book.name} - {doc.title}")
-                # await asyncio.sleep(5)
                 return await self.docs_export(book, doc, save_path, retry=retry-1)
 
             url = response_data["data"]["url"]
-            logger.info(f"获取到下载链接，准备下载文档: {book.name} - {doc.title}")
+            logger.info(f"获取到下载链接，准备下载文档({export_format}): {book.name} - {doc.title}")
 
             # 下载文档内容
             download_response = self._requestSession.get(url)
 
             if download_response.status_code == 200:
-                download_response.encoding = download_response.apparent_encoding
                 content = download_response.content
 
-                header_content = f"""
+                # PDF格式直接保存二进制内容
+                if export_format == "pdf":
+                    try:
+                        # 确保目录存在
+                        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+                        # 先写入临时文件，成功后再重命名
+                        temp_path = save_path + ".temp"
+                        with open(temp_path, "wb") as f:
+                            f.write(content)
+
+                        # 如果文件存在则先备份
+                        if os.path.exists(save_path):
+                            backup_path = save_path + ".bak"
+                            try:
+                                if os.path.exists(backup_path):
+                                    os.remove(backup_path)
+                                os.rename(save_path, backup_path)
+                            except Exception as e:
+                                logger.warning(
+                                    f"创建备份文件失败: {e}，文档: {book.name} - {doc.title}")
+
+                        # 重命名临时文件为目标文件
+                        os.replace(temp_path, save_path)
+
+                        logger.info(
+                            f"下载成功: {book.name} - {doc.title} ({save_path})")
+                        return True
+                    except Exception as e:
+                        logger.error(f"保存PDF文件时出错: {e}，文档: {book.name} - {doc.title}")
+                        return False
+                
+                # Markdown格式处理文本内容
+                else:
+                    download_response.encoding = download_response.apparent_encoding
+
+                    header_content = f"""
 ```meta_data
 知识库名称：{book.name} ({book.id})
 介绍：{book.description} 
@@ -195,67 +254,62 @@ class Yuque:
 原文地址: {self.base_url}/{book.slug}/{doc.slug} 
 """
 
-                # 协助者信息
-                try:
-                    doc_detail: YuqueDocDetail = await self.overview(book, doc)
-                    header_content += "由"
-                    for contributor in doc_detail.contributors:
-                        header_content += f"{contributor.name}({contributor.login}) "
-                    header_content += "编辑"
-                except Exception as e:
-                    logger.warning(
-                        f"获取文档协助者信息失败: {e}，文档: {book.name} - {doc.title}")
+                    # 协助者信息
+                    try:
+                        doc_detail: YuqueDocDetail = await self.overview(book, doc)
+                        header_content += "由"
+                        for contributor in doc_detail.contributors:
+                            header_content += f"{contributor.name}({contributor.login}) "
+                        header_content += "编辑"
+                    except Exception as e:
+                        logger.warning(
+                            f"获取文档协助者信息失败: {e}，文档: {book.name} - {doc.title}")
 
-                header_content += "\n```\n\n"
+                    header_content += "\n```\n\n"
 
-                try:
-                    content = re.sub(
-                        r'<font\s+style="[^"]*">(.*?)</font>', r'\1', content.decode('utf-8'))
+                    try:
+                        content_text = re.sub(
+                            r'<font\s+style="[^"]*">(.*?)</font>', r'\1', content.decode('utf-8'))
 
-                    # 确保目录存在
-                    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                        # 确保目录存在
+                        os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
-                    # 先写入临时文件，成功后再重命名，避免写入失败导致文件损坏
-                    temp_path = save_path + ".temp"
-                    with open(temp_path, "w", encoding="utf-8") as f:
-                        f.write(header_content + content)
+                        # 先写入临时文件，成功后再重命名，避免写入失败导致文件损坏
+                        temp_path = save_path + ".temp"
+                        with open(temp_path, "w", encoding="utf-8") as f:
+                            f.write(header_content + content_text)
 
-                    # 如果文件存在则先备份
-                    if os.path.exists(save_path):
-                        backup_path = save_path + ".bak"
-                        try:
-                            if os.path.exists(backup_path):
-                                os.remove(backup_path)
-                            os.rename(save_path, backup_path)
-                        except Exception as e:
-                            logger.warning(
-                                f"创建备份文件失败: {e}，文档: {book.name} - {doc.title}")
+                        # 如果文件存在则先备份
+                        if os.path.exists(save_path):
+                            backup_path = save_path + ".bak"
+                            try:
+                                if os.path.exists(backup_path):
+                                    os.remove(backup_path)
+                                os.rename(save_path, backup_path)
+                            except Exception as e:
+                                logger.warning(
+                                    f"创建备份文件失败: {e}，文档: {book.name} - {doc.title}")
 
-                    # 重命名临时文件为目标文件
-                    os.replace(temp_path, save_path)
+                        # 重命名临时文件为目标文件
+                        os.replace(temp_path, save_path)
 
-                    logger.info(
-                        f"下载成功: {book.name} - {doc.title} ({save_path})")
-                    return True
-                except Exception as e:
-                    logger.error(f"保存文件时出错: {e}，文档: {book.name} - {doc.title}")
-                    return False
+                        logger.info(
+                            f"下载成功: {book.name} - {doc.title} ({save_path})")
+                        return True
+                    except Exception as e:
+                        logger.error(f"保存Markdown文件时出错: {e}，文档: {book.name} - {doc.title}")
+                        return False
 
             elif download_response.status_code == 422:
                 logger.warning(f"文档导出未就绪，等待后重试: {book.name} - {doc.title}")
-                # 增加等待时间，避免频繁请求
-                # await asyncio.sleep(retry * 2 + 3)
                 return await self.docs_export(book, doc, save_path, retry=retry-1)
             else:
                 logger.error(
                     f"下载文档失败，状态码: {download_response.status_code}，文档: {book.name} - {doc.title}")
-                # await asyncio.sleep(5)
                 return await self.docs_export(book, doc, save_path, retry=retry-1)
 
         except Exception as e:
             logger.exception(f"导出文档过程中发生异常: {e}，文档: {book.name} - {doc.title}")
-            # 增加等待时间
-            # await asyncio.sleep(retry * 2)
             return await self.docs_export(book, doc, save_path, retry=retry-1)
 
     async def overview(self, book: YuqueBook, doc: YuqueDocs) -> YuqueDocDetail:
@@ -336,7 +390,7 @@ async def download_all():
                         base_path, sanitize_filename(book.name))
                     os.makedirs(dir_path, exist_ok=True)
                     save_path = os.path.join(
-                        dir_path, sanitize_filename(doc.title) + ".md")
+                        dir_path, sanitize_filename(doc.title) + get_file_extension())
 
                     if os.path.exists(save_path):
                         # 检查文件是否需要更新
@@ -516,7 +570,7 @@ async def monitor_updates():
                                 base_path, sanitize_filename(book.name))
                             os.makedirs(dir_path, exist_ok=True)
                             save_path = os.path.join(
-                                dir_path, sanitize_filename(doc.title) + ".md")
+                                dir_path, sanitize_filename(doc.title) + get_file_extension())
 
                             export_success = await yuque.docs_export(book, doc, save_path)
 

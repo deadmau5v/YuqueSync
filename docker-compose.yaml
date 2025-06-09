@@ -16,6 +16,7 @@ services:
       - YUQUE_BASE_URL=https://www.yuque.com
       - SAVE_PATH=/data
       - MONITOR_INTERVAL_MINUTES=10
+      - EXPORT_FORMAT=pdf
     networks:
       - yuque-network
 

@@ -34,8 +34,8 @@ docker run -d \
 # 方式二：使用 docker-compose
 # 1. 编辑 docker-compose.yaml 中的环境变量
 # 2. 修改 volumes 中的本地路径
-# 3. 运行：
-docker-compose up -d
+# 3. 构建并运行：
+docker-compose up -d --build
 ```
 
 ### 3. 环境变量说明
@@ -47,6 +47,7 @@ docker-compose up -d
 | `YUQUE_BASE_URL` | ❌ | `https://www.yuque.com` | 语雀网站地址 |
 | `SAVE_PATH` | ❌ | `/data` | 文档保存路径 |
 | `MONITOR_INTERVAL_MINUTES` | ❌ | `10` | 同步间隔（分钟） |
+| `EXPORT_FORMAT` | ❌ | `pdf` | 导出格式（pdf 或 markdown） |
 
 ## 本地运行
 
@@ -68,9 +69,10 @@ python main.py monitor   # 持续监控
 
 1. **全面的同步功能**:
    * 🔄 实时同步更新
-   * 📄 支持 Markdown、PDF、Word 等多种格式
+   * 📄 支持 PDF 和 Markdown 两种导出格式（默认PDF）
    * 🗂️ 支持同步整个知识库
    * 🔍 智能检测文档变更
+   * 📖 PDF导出包含目录（TOC）支持
    
 2. **文档处理功能**:
    * 📝 保持原文档格式
@@ -82,19 +84,6 @@ python main.py monitor   # 持续监控
    * 🎨 支持浅色/深色主题
    * 💾 文档备份功能
    * 🐳 Docker 容器化部署
-
-# 📝 待办事项
-
-- [ ] 支持更多文档格式
-- [ ] 同步进度显示优化
-- [ ] 支持自定义同步模板
-- [ ] 批量同步优化
-- [ ] Bug 修复和改进 (进行中...)
-- [ ] 插件功能支持
-- [ ] 浏览器扩展
-- [ ] 移动端支持
-- [ ] 数据同步支持自定义内容
-
 
 # 🤝 贡献指南
 

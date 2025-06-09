@@ -19,6 +19,7 @@ ENV YUQUE_TOKEN=""
 ENV YUQUE_SESSION=""
 ENV SAVE_PATH="/data"
 ENV MONITOR_INTERVAL_MINUTES="10"
+ENV EXPORT_FORMAT="pdf"
 
 # 创建启动脚本
 RUN echo '#!/bin/sh\n\
@@ -33,6 +34,7 @@ fi\n\
 echo "语雀同步工具启动中..."\n\
 echo "保存路径: $SAVE_PATH"\n\
 echo "同步间隔: ${MONITOR_INTERVAL_MINUTES}分钟"\n\
+echo "导出格式: $EXPORT_FORMAT"\n\
 echo "语雀地址: $YUQUE_BASE_URL"\n\
 \n\
 # 主循环，按设定间隔同步\n\

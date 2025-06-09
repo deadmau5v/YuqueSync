@@ -1,4 +1,4 @@
-name: Release
+name: Build Python Executables
 
 on:
   push:
@@ -6,19 +6,19 @@ on:
       - 'v*'
 
 jobs:
-  release:
+  build-executables:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
-        python-version: ['3.10']
+        python-version: ['3.12']
         include:
           - os: windows-latest
-            asset_name: yuquedownload-windows.exe
+            asset_name: yuque-sync-windows.exe
           - os: macos-latest
-            asset_name: yuquedownload-macos
+            asset_name: yuque-sync-macos
           - os: ubuntu-latest
-            asset_name: yuquedownload-linux
+            asset_name: yuque-sync-linux
 
     steps:
     - uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
 
     - name: Build executable
       run: |
-        pyinstaller --onefile --name ${{ matrix.asset_name }} src/main.py
+        pyinstaller --onefile --name ${{ matrix.asset_name }} main.py
 
     - name: Upload Release Asset
       uses: softprops/action-gh-release@v1
