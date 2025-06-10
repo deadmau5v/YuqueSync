@@ -128,7 +128,7 @@ class Yuque:
         response.raise_for_status()
         return [YuqueDocs(g) for g in response.json()["data"]]
 
-    async def docs_export(self, book: YuqueBook, doc: YuqueDocs, save_path: str, retry: int = 1) -> bool:
+    async def docs_export(self, book: YuqueBook, doc: YuqueDocs, save_path: str, retry: int = 5) -> bool:
         """
         导出文档到本地
 
@@ -189,9 +189,26 @@ class Yuque:
 
             # 解析响应获取下载URL
             response_data = response.json()
-            if "data" not in response_data or "url" not in response_data["data"]:
+            if "data" not in response_data:
                 logger.error(
                     f"导出响应格式错误: {response_data}，文档: {book.name} - {doc.title}")
+                return await self.docs_export(book, doc, save_path, retry=retry-1)
+            
+            # 检查导出状态
+            if "state" in response_data["data"]:
+                state = response_data["data"]["state"]
+                if state == "pending":
+                    logger.info(f"文档导出处理中，等待后重试: {book.name} - {doc.title}")
+                    # 等待5秒后重试
+                    await asyncio.sleep(10)
+                    return await self.docs_export(book, doc, save_path, retry=retry-1)
+                elif state == "error":
+                    logger.error(f"文档导出失败: {book.name} - {doc.title}")
+                    return False
+            
+            if "url" not in response_data["data"]:
+                logger.error(
+                    f"导出响应中缺少下载URL: {response_data}，文档: {book.name} - {doc.title}")
                 return await self.docs_export(book, doc, save_path, retry=retry-1)
 
             url = response_data["data"]["url"]
