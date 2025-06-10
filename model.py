@@ -30,7 +30,7 @@ class YuqueBook:
         self.doc_viewport: str = data.get('doc_viewport')  # 文档视口，如 fixed
         
     def __str__(self):
-        return f"YuqueBook(id={self.id}, name={self.name}, slug={self.slug}, description={self.description.replace("\n", "")}, type={self.type}, updated_at={self.updated_at})"
+        return f"YuqueBook(id={self.id}, name={self.name}, slug={self.slug}, description={self.description.replace(chr(10), '')}, type={self.type}, updated_at={self.updated_at})"
 
     def __repr__(self):
         return self.__str__()
