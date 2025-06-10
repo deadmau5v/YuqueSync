@@ -197,7 +197,8 @@ class QuickLinkGroup:
             self.user = None
     
     def __str__(self):
-        return f"QuickLinkGroup(id={self.id}, title={self.title},  {"未读" if self.user.hasActivities else "已读"})"
+        status = "未读" if self.user and self.user.hasActivities else "已读"
+        return f"QuickLinkGroup(id={self.id}, title={self.title}, status={status})"
     
     def __repr__(self):
         return self.__str__()
