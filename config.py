@@ -1,10 +1,18 @@
 import os
 from typing import Any
+from dotenv import load_dotenv
+
+def load_env():
+    """
+    加载环境变量
+    """
+    load_dotenv()
 
 def get_config() -> dict[str, Any]:
     """
     从环境变量获取配置，如果环境变量不存在则使用默认值
     """
+    load_env()
     config = {
         "yuque": {
             "base_url": os.getenv("YUQUE_BASE_URL", "https://www.yuque.com"),

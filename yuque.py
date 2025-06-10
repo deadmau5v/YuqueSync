@@ -8,7 +8,6 @@ import requests
 import re
 from config import get_config
 from model import QuickLinksData, YuqueBook, YuqueDocs, YuqueDocDetail, YuqueGroup
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -198,6 +197,10 @@ class Yuque:
             url = response_data["data"]["url"]
             logger.info(f"获取到下载链接，准备下载文档({export_format}): {book.name} - {doc.title}")
 
+            # 如果URL是相对路径，则添加base_url前缀
+            if url.startswith('/'):
+                url = self.base_url + url
+
             # 下载文档内容
             download_response = self._requestSession.get(url)
 
@@ -328,7 +331,7 @@ class Yuque:
         return YuqueDocDetail(response.json()["data"])
 
     async def quick_links(self) -> QuickLinksData:
-        api = f"/api/mine/group_quick_links"
+        api = "/api/mine/group_quick_links"
         url = self.base_url + api
 
         response = self._requestSession.get(url)
@@ -340,7 +343,7 @@ class Yuque:
             "offset": 0,
             "limit": 200,
         }
-        api = f"/api/mine/groups"
+        api = "/api/mine/groups"
         url = self.base_url + api
 
         response = self._requestSession.get(url, params=params)
@@ -596,7 +599,7 @@ async def monitor_updates():
 
 async def download_and_monitor(interval_minutes=60):
     """下载所有文档并持续监控更新"""
-    cfg = get_config()
+    get_config()
 
     try:
         # 首次运行时下载所有文档
