@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 from typing import Any
 from dotenv import load_dotenv
@@ -6,7 +7,12 @@ def load_env():
     """
     加载环境变量
     """
-    load_dotenv()
+    try:
+        load_dotenv()
+    except:
+        print("跳过加载 .env")
+        pass
+        
 
 def get_config() -> dict[str, Any]:
     """

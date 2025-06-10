@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 class YuqueBook:
     """
     语雀知识库对象模型

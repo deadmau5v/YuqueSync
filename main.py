@@ -1,9 +1,15 @@
+# -*- coding: utf-8 -*-
 import asyncio
 import logging
 import argparse
 import sys
+import os
 from yuque import download_all, download_and_monitor
 from config import get_config, save_config
+
+# 设置Windows环境下的UTF-8编码支持
+if sys.platform.startswith('win'):
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
 
 # 配置日志
 logging.basicConfig(
