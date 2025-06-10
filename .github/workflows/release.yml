@@ -10,13 +10,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [ubuntu-latest]
         python-version: ['3.12']
         include:
-          - os: windows-latest
-            asset_name: yuque-sync-windows.exe
-          - os: macos-latest
-            asset_name: yuque-sync-macos
           - os: ubuntu-latest
             asset_name: yuque-sync-linux
 
