@@ -27,3 +27,5 @@ wheels/
 .env
 .env.local
 .env.*.local
+
+data/
