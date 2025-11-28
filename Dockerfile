@@ -15,8 +15,6 @@ RUN mkdir -p /data
 
 # 设置环境变量默认值
 ENV YUQUE_BASE_URL="https://www.yuque.com"
-ENV YUQUE_TOKEN=""
-ENV YUQUE_SESSION=""
 ENV SAVE_PATH="/data"
 ENV MONITOR_INTERVAL_MINUTES="10"
 ENV EXPORT_FORMAT="pdf"
