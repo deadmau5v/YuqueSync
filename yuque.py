@@ -61,6 +61,7 @@ class Yuque:
         config = get_config()["yuque"]
 
         self.base_url = config.get("base_url")
+        self.is_initialized = False
 
         if self.base_url is None:
             logger.error("未设置语雀 base url")
@@ -71,7 +72,11 @@ class Yuque:
         self._session = config.get("session")
 
         if self._token is None or self._session is None:
-            logger.error("未设置语雀 Token 或 session.")
+            logger.error("未设置语雀 Token 或 session，请设置环境变量 YUQUE_TOKEN 和 YUQUE_SESSION")
+            return
+
+        if not self._token or not self._session:
+            logger.error("语雀 Token 或 session 为空，请检查环境变量配置或 .env 文件")
             return
 
         self._requestSession = requests.session()
@@ -85,49 +90,210 @@ class Yuque:
         })
 
         if not self._test():
-            logger.error("语雀测试未通过")
+            logger.error("语雀连接测试失败，请检查 Token 和 Session 是否正确")
+            logger.error("获取方式: 浏览器登录语雀 → F12开发者工具 → Network标签 → 查看请求头Cookie")
+            return
+
+        self.is_initialized = True
+        logger.info("语雀客户端初始化成功")
 
     def _test(self):
-        response = self._requestSession.get(
-            self.base_url + "/api/mine/getRecommendationTip?type=activityLive")
-        if response.status_code == 200:
-            return True
-        return False
+        test_url = self.base_url + "/api/mine/getRecommendationTip?type=activityLive"
+        try:
+            response = self._requestSession.get(test_url)
+            if response.status_code == 200:
+                return True
+            else:
+                logger.error(f"连接测试失败，状态码: {response.status_code}")
+                return False
+        except Exception as e:
+            logger.error(f"连接测试异常: {e}")
+            return False
 
     async def books(self) -> list[YuqueBook]:
         """
         获取知识库
+        支持两种 API：
+        1. /api/mine/common_used (新版，个人版)
+        2. /api/mine/user_books (旧版，企业版)
+
         :return:  知识库列表
         """
-        params = {
-            "offset": 0,  # 分页 偏移
-            "limit": 100,  # 分页 大小
-            "query": "",  # 查询
-            "user_type": "Group"  # 固定
-        }
-        api = "/api/mine/user_books"
+        if not self.is_initialized:
+            logger.error("语雀客户端未正确初始化，无法获取知识库，请检查 Token 和 Session 配置")
+            return []
 
-        url = self.base_url + api
+        # 尝试两个 API 端点
+        api_endpoints = [
+            {
+                "name": "common_used (新版API)",
+                "path": "/api/mine/common_used",
+                "params": None
+            },
+            {
+                "name": "user_books (旧版API/企业版)",
+                "path": "/api/mine/user_books",
+                "params": {
+                    "offset": 0,
+                    "limit": 100,
+                    "query": "",
+                    "user_type": "Group"
+                }
+            }
+        ]
 
-        response = self._requestSession.get(url, params=params)
-        response.raise_for_status()
-        return [YuqueBook(g) for g in response.json()["data"]]
+        for api_index, api_config in enumerate(api_endpoints):
+            api_name = api_config["name"]
+            api_path = api_config["path"]
+            api_params = api_config["params"]
+
+            logger.info(f"尝试获取知识库: {api_name}")
+            url = self.base_url + api_path
+
+            try:
+                if api_params:
+                    response = self._requestSession.get(url, params=api_params)
+                else:
+                    response = self._requestSession.get(url)
+
+                # 检查HTTP状态码
+                if response.status_code != 200:
+                    logger.warning(f"API {api_name} 请求失败，状态码: {response.status_code}")
+                    if api_index < len(api_endpoints) - 1:
+                        continue
+                    else:
+                        response.raise_for_status()
+
+                # 获取响应JSON
+                response_json = response.json()
+
+                # 检查响应格式
+                if "data" not in response_json:
+                    logger.warning(f"API {api_name} 响应缺少 'data' 字段")
+                    if api_index < len(api_endpoints) - 1:
+                        continue
+                    else:
+                        raise ValueError(f"响应JSON中缺少 'data' 字段")
+
+                data = response_json["data"]
+
+                # 解析不同格式的响应
+                books_data = None
+
+                # 格式1: 新 API 返回 {"data": {"groups": [], "books": [...]}}
+                if isinstance(data, dict) and "books" in data:
+                    books_data = data["books"]
+
+                # 格式2: 旧 API 返回 {"data": [...]}
+                elif isinstance(data, list):
+                    books_data = data
+
+                else:
+                    logger.warning(f"API {api_name} 返回了无法识别的数据格式")
+                    if api_index < len(api_endpoints) - 1:
+                        continue
+                    else:
+                        raise ValueError(f"无法识别的数据格式")
+
+                # 检查是否为空
+                if not books_data or len(books_data) == 0:
+                    logger.warning(f"API {api_name} 返回的知识库列表为空")
+                    if api_index < len(api_endpoints) - 1:
+                        continue
+                    else:
+                        logger.info("所有 API 都返回空列表")
+                        return []
+
+                logger.info(f"使用 {api_name} 获取到 {len(books_data)} 个知识库")
+
+                # 解析知识库列表
+                books = []
+                for idx, book_item in enumerate(books_data):
+                    try:
+                        # 新 API 返回的每个 book 项包含 target 字段，target 才是真正的 book 数据
+                        if "target" in book_item and isinstance(book_item["target"], dict):
+                            book_data = book_item["target"]
+                        else:
+                            # 兼容直接返回 book 数据的情况
+                            book_data = book_item
+
+                        book = YuqueBook(book_data)
+                        books.append(book)
+                    except Exception as e:
+                        logger.warning(f"解析知识库 {idx + 1} 失败: {e}")
+
+                logger.info(f"成功获取 {len(books)} 个知识库")
+                return books
+
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"API {api_name} 网络请求异常: {e}")
+                if api_index < len(api_endpoints) - 1:
+                    continue
+                else:
+                    logger.error("所有 API 都失败")
+                    raise
+            except json.JSONDecodeError as e:
+                logger.warning(f"API {api_name} JSON解析失败: {e}")
+                if api_index < len(api_endpoints) - 1:
+                    continue
+                else:
+                    logger.error("所有 API 都失败")
+                    raise
+            except Exception as e:
+                logger.warning(f"API {api_name} 处理异常: {e}")
+                if api_index < len(api_endpoints) - 1:
+                    continue
+                else:
+                    logger.error("所有 API 都失败")
+                    raise
+
+        # 理论上不会到达这里
+        logger.error("所有 API 尝试都失败")
+        return []
 
     async def docs(self, book: YuqueBook) -> list[YuqueDocs]:
         """
         获取知识库的文档列表
         :return:  文档列表
         """
-        params = {
-            "book_id": book.id,
-        }
-        api = "/api/docs"
+        if not self.is_initialized:
+            logger.error("语雀客户端未正确初始化")
+            return []
 
+        params = {"book_id": book.id}
+        api = "/api/docs"
         url = self.base_url + api
 
-        response = self._requestSession.get(url, params=params)
-        response.raise_for_status()
-        return [YuqueDocs(g) for g in response.json()["data"]]
+        try:
+            response = self._requestSession.get(url, params=params)
+
+            if response.status_code != 200:
+                logger.error(f"获取文档列表失败，状态码: {response.status_code}")
+                response.raise_for_status()
+
+            response_json = response.json()
+
+            if "data" not in response_json:
+                raise ValueError("响应JSON中缺少 'data' 字段")
+
+            data = response_json["data"]
+            if not isinstance(data, list):
+                raise ValueError(f"data 字段不是列表类型")
+
+            docs = []
+            for doc_data in data:
+                try:
+                    doc = YuqueDocs(doc_data)
+                    docs.append(doc)
+                except Exception as e:
+                    logger.warning(f"解析文档失败: {e}")
+
+            logger.info(f"知识库 '{book.name}' 获取到 {len(docs)} 个文档")
+            return docs
+
+        except Exception as e:
+            logger.error(f"获取文档列表异常: {e}")
+            raise
 
     async def docs_export(self, book: YuqueBook, doc: YuqueDocs, save_path: str, retry: int = 5) -> bool:
         """
@@ -199,7 +365,7 @@ class Yuque:
             if "state" in response_data["data"]:
                 state = response_data["data"]["state"]
                 if state == "pending":
-                    logger.info(f"文档导出处理中，等待后重试: {book.name} - {doc.title}")
+                    logger.info(f"文档导出处理中，等待服务器生成文件后下载: {book.name} - {doc.title}")
                     # 等待5秒后重试
                     await asyncio.sleep(10)
                     return await self.docs_export(book, doc, save_path, retry=retry-1)
@@ -322,7 +488,7 @@ class Yuque:
                         return False
 
             elif download_response.status_code == 422:
-                logger.warning(f"文档导出未就绪，等待后重试: {book.name} - {doc.title}")
+                logger.warning(f"文档导出未就绪，等待服务器生成文件后下载: {book.name} - {doc.title}")
                 return await self.docs_export(book, doc, save_path, retry=retry-1)
             else:
                 logger.error(
