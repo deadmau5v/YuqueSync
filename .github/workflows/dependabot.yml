@@ -1,25 +1,11 @@
-version: 2
-updates:
-  - package-ecosystem: "pip"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
-    labels:
-      - "dependencies"
-      - "automerge"
-    commit-message:
-      prefix: "⬆️"
-      include: "scope"
+name: "Dependabot config moved"
+on:
+  workflow_dispatch:
 
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
-    labels:
-      - "dependencies"
-      - "automerge"
-    commit-message:
-      prefix: "⬆️"
-      include: "scope" 
+jobs:
+  note:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inform
+        run: echo "Dependabot config moved to .github/dependabot.yml"
+ 
