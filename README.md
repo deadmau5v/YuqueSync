@@ -29,7 +29,7 @@ docker run -d \
   -e YUQUE_TOKEN="你的token" \
   -e YUQUE_SESSION="你的session" \
   -v /path/to/save:/data \
-  yuque-sync
+  ghcr.io/d5v/yuquesync:latest
 
 # 方式二：使用 docker-compose
 # 1. 编辑 docker-compose.yaml 中的环境变量

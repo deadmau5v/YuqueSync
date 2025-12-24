@@ -123,7 +123,7 @@ jobs:
             -e YUQUE_TOKEN="你的token" \
             -e YUQUE_SESSION="你的session" \
             -v ./data:/data \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get_tag.outputs.tag }}
+            ghcr.io/d5v/yuquesync:latest
           
           # 方式二：使用 docker-compose（推荐）
           # 1. 下载 docker-compose-release.yml
@@ -184,7 +184,7 @@ jobs:
               -e YUQUE_TOKEN="你的token" \
               -e YUQUE_SESSION="你的session" \
               -v ./data:/data \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get_tag.outputs.tag }}
+              ghcr.io/d5v/yuquesync:latest
             ```
             
             ### 📁 下载文件
