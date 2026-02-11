@@ -50,15 +50,22 @@ async def main():
     # 根据命令执行对应操作
     if args.command == 'download':
         logger.info("开始下载所有文档...")
-        await download_all()
-        logger.info("所有文档下载完成！")
+        success = await download_all()
+        if success:
+            logger.info("所有文档下载完成！")
+        else:
+            logger.error("下载失败")
+            return 1
     
     elif args.command == 'monitor':
         interval = args.interval if args.interval else get_config().get("monitor_interval_minutes", 60)
         logger.info(f"开始监控文档更新，间隔时间: {interval}分钟")
         if args.interval:
             logger.info(f"使用命令行指定的间隔时间: {args.interval}分钟")
-        await download_and_monitor(interval)
+        success = await download_and_monitor(interval)
+        if success is False:
+            logger.error("监控启动失败")
+            return 1
     
     elif args.command == 'config':
         if args.interval:

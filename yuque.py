@@ -152,11 +152,15 @@ class Yuque:
     def __init__(self):
         config = get_config()["yuque"]
 
-        self.base_url = config.get("base_url")
+        raw_base_url = config.get("base_url")
+        self.base_url = (
+            str(raw_base_url).strip().rstrip("/") if raw_base_url is not None else None
+        )
         self.is_initialized = False
+        self.init_error = ""
 
-        if self.base_url is None:
-            logger.error("[init] 未设置语雀 base_url")
+        if self.base_url is None or not self.base_url:
+            self._set_init_error("未设置语雀 base_url")
             return
 
         # request
@@ -164,14 +168,14 @@ class Yuque:
         self._session = config.get("session")
 
         if self._token is None or self._session is None:
-            logger.error(
-                "[init] 未设置语雀 Token 或 Session，请设置环境变量 YUQUE_TOKEN 和 YUQUE_SESSION"
+            self._set_init_error(
+                "未设置语雀 Token 或 Session，请设置环境变量 YUQUE_TOKEN 和 YUQUE_SESSION"
             )
             return
 
         if not self._token or not self._session:
-            logger.error(
-                "[init] 语雀 Token 或 Session 为空，请检查环境变量配置或 .env 文件"
+            self._set_init_error(
+                "语雀 Token 或 Session 为空，请检查环境变量配置或 .env 文件"
             )
             return
 
@@ -185,7 +189,8 @@ class Yuque:
         )
 
         if not self._test():
-            logger.error("[init] 语雀连接测试失败，请检查 Token 和 Session")
+            if not self.init_error:
+                self._set_init_error("语雀连接测试失败，请检查 Token 和 Session")
             logger.error(
                 "[init] 获取方式: 浏览器登录语雀 → F12 → Network → 请求头 Cookie"
             )
@@ -194,6 +199,10 @@ class Yuque:
         self.is_initialized = True
         logger.info("[init] 语雀客户端初始化成功")
 
+    def _set_init_error(self, message: str) -> None:
+        self.init_error = message
+        logger.error("[init] %s", message)
+
     def _test(self):
         test_url = self.base_url + "/api/mine/getRecommendationTip?type=activityLive"
         try:
@@ -201,10 +210,10 @@ class Yuque:
             if response.status_code == 200:
                 return True
 
-            logger.error("[init] 连接测试失败 status=%s", response.status_code)
+            self._set_init_error(f"连接测试失败 status={response.status_code}")
             return False
         except Exception as exc:
-            logger.error("[init] 连接测试异常 error=%s", exc)
+            self._set_init_error(f"连接测试异常 error={exc}")
             return False
 
     def _extract_books_data(self, data):
@@ -317,7 +326,10 @@ class Yuque:
         :return:  知识库列表
         """
         if not self.is_initialized:
-            logger.error("[books] 客户端未初始化，无法获取知识库")
+            logger.error(
+                "[books] 客户端未初始化，无法获取知识库 error=%s",
+                self.init_error or "未知初始化错误",
+            )
             return []
 
         api_config = {
@@ -333,6 +345,8 @@ class Yuque:
         # 非主站就是企业版
         if self.base_url != "https://www.yuque.com":
             api_config["params"]["user_type"] = "Group"
+            api_config["name"] = "group_books"
+            
 
         api_name = api_config["name"]
         api_path = api_config["path"]
@@ -389,7 +403,11 @@ class Yuque:
         :return:  文档列表
         """
         if not self.is_initialized:
-            logger.error("[docs] 客户端未初始化 %s", format_book_context(book))
+            logger.error(
+                "[docs] 客户端未初始化 %s error=%s",
+                format_book_context(book),
+                self.init_error or "未知初始化错误",
+            )
             return []
 
         context = format_book_context(book)
@@ -645,7 +663,10 @@ async def download_all():
     export_format = cfg.get("export_format", "pdf")
 
     if not yuque.is_initialized:
-        logger.error("[download] 客户端初始化失败，终止下载")
+        logger.error(
+            "[download] 客户端初始化失败，终止下载 error=%s",
+            yuque.init_error or "未知初始化错误",
+        )
         return False
 
     stats = {
@@ -870,7 +891,10 @@ async def monitor_updates():
     export_format = cfg.get("export_format", "pdf")
 
     if not yuque.is_initialized:
-        logger.error("[monitor] 客户端初始化失败，终止监控")
+        logger.error(
+            "[monitor] 客户端初始化失败，终止监控 error=%s",
+            yuque.init_error or "未知初始化错误",
+        )
         return False
 
     versions = await load_document_versions()
@@ -943,11 +967,19 @@ async def download_and_monitor(interval_minutes=60):
 
     try:
         logger.info("[monitor] 首次运行，执行全量下载")
-        await download_all()
+        first_download_ok = await download_all()
+        if not first_download_ok:
+            logger.error("[monitor] 首次全量下载失败，终止监控")
+            return False
 
         while True:
             try:
-                await monitor_updates()
+                monitor_ok = await monitor_updates()
+                if not monitor_ok:
+                    logger.error("[monitor] 监控任务执行失败，等待60秒后重试")
+                    await asyncio.sleep(60)
+                    continue
+
                 logger.info(
                     "[monitor] 等待下次检查 interval_minutes=%s", interval_minutes
                 )
@@ -959,3 +991,4 @@ async def download_and_monitor(interval_minutes=60):
     except Exception as exc:
         logger.exception("[monitor] 程序运行异常 error=%s", exc)
         logger.info("[monitor] 程序将退出，请检查错误原因后重启")
+        return False
