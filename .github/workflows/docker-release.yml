@@ -25,9 +25,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Prepare image name
-        id: image
-        run: echo "name=$(echo \"${GITHUB_REPOSITORY_OWNER}/yuquesync\" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+      - name: Prepare image owner
+        id: image_owner
+        run: echo "value=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -43,7 +43,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
+          images: ${{ env.REGISTRY }}/${{ steps.image_owner.outputs.value }}/yuquesync
           tags: |
             type=ref,event=tag
             type=raw,value=latest,enable={{is_default_branch}}
@@ -71,9 +71,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Prepare image name
-        id: image
-        run: echo "name=$(echo \"${GITHUB_REPOSITORY_OWNER}/yuquesync\" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+      - name: Prepare image owner
+        id: image_owner
+        run: echo "value=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
 
       - name: Get tag name
         id: get_tag
@@ -86,7 +86,7 @@ jobs:
           
           services:
             yuque-sync:
-              image: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:${{ steps.get_tag.outputs.tag }}
+              image: ${{ env.REGISTRY }}/${{ steps.image_owner.outputs.value }}/yuquesync:${{ steps.get_tag.outputs.tag }}
               container_name: yuque-sync
               restart: always
               volumes:
@@ -130,7 +130,7 @@ jobs:
             -e YUQUE_TOKEN="你的token" \
             -e YUQUE_SESSION="你的session" \
             -v ./data:/data \
-            ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:latest
+            ${{ env.REGISTRY }}/${{ steps.image_owner.outputs.value }}/yuquesync:latest
           
           # 方式二：使用 docker-compose（推荐）
           # 1. 下载 docker-compose-release.yml
@@ -179,7 +179,7 @@ jobs:
             ## 🐳 Docker 镜像发布
             
             ### 镜像信息
-            - **镜像地址**: `${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:${{ steps.get_tag.outputs.tag }}`
+            - **镜像地址**: `${{ env.REGISTRY }}/${{ steps.image_owner.outputs.value }}/yuquesync:${{ steps.get_tag.outputs.tag }}`
             - **支持架构**: linux/amd64, linux/arm64
             - **导出格式**: PDF（默认）和 Markdown
             
@@ -191,7 +191,7 @@ jobs:
               -e YUQUE_TOKEN="你的token" \
               -e YUQUE_SESSION="你的session" \
               -v ./data:/data \
-              ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:latest
+              ${{ env.REGISTRY }}/${{ steps.image_owner.outputs.value }}/yuquesync:latest
             ```
             
             ### 📁 下载文件
