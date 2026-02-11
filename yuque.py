@@ -20,14 +20,14 @@ MAX_EXPORT_WORKERS = 3
 def get_file_extension(export_format: str = None) -> str:
     """
     根据导出格式获取文件扩展名
-    
+
     :param export_format: 导出格式 ("pdf" 或 "markdown")
     :return: 文件扩展名 (包含点号)
     """
     if export_format is None:
         cfg = get_config()
         export_format = cfg.get("export_format", "pdf")
-    
+
     return ".pdf" if export_format == "pdf" else ".md"
 
 
@@ -39,12 +39,12 @@ def sanitize_filename(title: str) -> str:
     :return: 合法的文件名
     """
     # 替换Windows和Unix系统中不允许的文件名字符
-    invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|']
+    invalid_chars = ["/", "\\", ":", "*", "?", '"', "<", ">", "|"]
     filename = title
 
     # 替换非法字符为下划线
     for char in invalid_chars:
-        filename = filename.replace(char, '_')
+        filename = filename.replace(char, "_")
 
     # 去除首尾空格
     filename = filename.strip()
@@ -70,7 +70,9 @@ def format_doc_context(book: YuqueBook, doc: YuqueDocs) -> str:
     return f"{format_book_context(book)} doc={doc.title}({doc.id})"
 
 
-def build_doc_save_path(base_path: str, book: YuqueBook, doc: YuqueDocs, export_format: str = None) -> str:
+def build_doc_save_path(
+    base_path: str, book: YuqueBook, doc: YuqueDocs, export_format: str = None
+) -> str:
     """构建文档保存路径，并确保目录存在。"""
     book_dir = os.path.join(os.path.abspath(base_path), sanitize_filename(book.name))
     os.makedirs(book_dir, exist_ok=True)
@@ -90,12 +92,12 @@ def get_export_payload(export_format: str) -> dict:
         return {
             "type": "pdf",
             "force": 0,
-            "options": "{\"enableToc\":1}",
+            "options": '{"enableToc":1}',
         }
 
     return {
         "force": 0,
-        "options": "{\"latexType\":1}",
+        "options": '{"latexType":1}',
         "type": "markdown",
     }
 
@@ -111,10 +113,14 @@ def backup_existing_file(save_path: str, context: str) -> None:
             os.remove(backup_path)
         os.rename(save_path, backup_path)
     except Exception as exc:
-        logger.warning("[file] 创建备份失败 %s path=%s error=%s", context, save_path, exc)
+        logger.warning(
+            "[file] 创建备份失败 %s path=%s error=%s", context, save_path, exc
+        )
 
 
-def save_content_atomically(save_path: str, content, binary: bool, context: str) -> bool:
+def save_content_atomically(
+    save_path: str, content, binary: bool, context: str
+) -> bool:
     """原子化保存文件内容，失败时避免破坏原文件。"""
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     temp_path = save_path + ".temp"
@@ -135,7 +141,9 @@ def save_content_atomically(save_path: str, content, binary: bool, context: str)
         return False
 
 
-def run_doc_export_sync(yuque_client, book: YuqueBook, doc: YuqueDocs, save_path: str) -> bool:
+def run_doc_export_sync(
+    yuque_client, book: YuqueBook, doc: YuqueDocs, save_path: str
+) -> bool:
     """在线程池中执行异步导出逻辑。"""
     return asyncio.run(yuque_client.docs_export(book, doc, save_path))
 
@@ -156,26 +164,31 @@ class Yuque:
         self._session = config.get("session")
 
         if self._token is None or self._session is None:
-            logger.error("[init] 未设置语雀 Token 或 Session，请设置环境变量 YUQUE_TOKEN 和 YUQUE_SESSION")
+            logger.error(
+                "[init] 未设置语雀 Token 或 Session，请设置环境变量 YUQUE_TOKEN 和 YUQUE_SESSION"
+            )
             return
 
         if not self._token or not self._session:
-            logger.error("[init] 语雀 Token 或 Session 为空，请检查环境变量配置或 .env 文件")
+            logger.error(
+                "[init] 语雀 Token 或 Session 为空，请检查环境变量配置或 .env 文件"
+            )
             return
 
         self._requestSession = requests.session()
         self._requestSession.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
-        self._requestSession.cookies.update({
-            "yuque_ctoken": self._token,
-            "_yuque_session": self._session
-        })
+        self._requestSession.cookies.update(
+            {"yuque_ctoken": self._token, "_yuque_session": self._session}
+        )
 
         if not self._test():
             logger.error("[init] 语雀连接测试失败，请检查 Token 和 Session")
-            logger.error("[init] 获取方式: 浏览器登录语雀 → F12 → Network → 请求头 Cookie")
+            logger.error(
+                "[init] 获取方式: 浏览器登录语雀 → F12 → Network → 请求头 Cookie"
+            )
             return
 
         self.is_initialized = True
@@ -207,14 +220,21 @@ class Yuque:
         books = []
         for idx, book_item in enumerate(books_data):
             try:
-                if isinstance(book_item, dict) and isinstance(book_item.get("target"), dict):
+                if isinstance(book_item, dict) and isinstance(
+                    book_item.get("target"), dict
+                ):
                     book_data = book_item["target"]
                 else:
                     book_data = book_item
 
                 books.append(YuqueBook(book_data))
             except Exception as exc:
-                logger.warning("[books] 解析知识库失败 api=%s index=%s error=%s", api_name, idx + 1, exc)
+                logger.warning(
+                    "[books] 解析知识库失败 api=%s index=%s error=%s",
+                    api_name,
+                    idx + 1,
+                    exc,
+                )
 
         return books
 
@@ -272,18 +292,27 @@ class Yuque:
     def _save_pdf_export(self, content: bytes, save_path: str, context: str) -> bool:
         return save_content_atomically(save_path, content, binary=True, context=context)
 
-    async def _save_markdown_export(self, book: YuqueBook, doc: YuqueDocs, content_text: str, save_path: str,
-                                    context: str) -> bool:
+    async def _save_markdown_export(
+        self,
+        book: YuqueBook,
+        doc: YuqueDocs,
+        content_text: str,
+        save_path: str,
+        context: str,
+    ) -> bool:
         header_content = await self._build_markdown_header(book, doc)
-        markdown_body = re.sub(r'<font\s+style="[^"]*">(.*?)</font>', r'\1', content_text)
-        return save_content_atomically(save_path, header_content + markdown_body, binary=False, context=context)
+        markdown_body = re.sub(
+            r'<font\s+style="[^"]*">(.*?)</font>', r"\1", content_text
+        )
+        return save_content_atomically(
+            save_path, header_content + markdown_body, binary=False, context=context
+        )
 
     async def books(self) -> list[YuqueBook]:
         """
         获取知识库
-        支持两种 API：
-        1. /api/mine/common_used (新版，个人版)
-        2. /api/mine/user_books (旧版，企业版)
+        使用通用接口
+        /api/mine/user_books
 
         :return:  知识库列表
         """
@@ -291,87 +320,68 @@ class Yuque:
             logger.error("[books] 客户端未初始化，无法获取知识库")
             return []
 
-        api_endpoints = [
-            {
-                "name": "common_used",
-                "path": "/api/mine/common_used",
-                "params": None,
+        api_config = {
+            "name": "user_books",
+            "path": "/api/mine/user_books",
+            "params": {
+                "offset": 0,
+                "limit": 100,
+                "query": "",
+                "user_type": "User",
             },
-            {
-                "name": "user_books",
-                "path": "/api/mine/user_books",
-                "params": {
-                    "offset": 0,
-                    "limit": 100,
-                    "query": "",
-                    "user_type": "Group",
-                },
-            },
-        ]
+        }
+        # 非主站就是企业版
+        if self.base_url != "https://www.yuque.com":
+            api_config["params"]["user_type"] = "Group"
 
-        for index, api_config in enumerate(api_endpoints):
-            has_next = index < len(api_endpoints) - 1
-            api_name = api_config["name"]
-            api_path = api_config["path"]
-            api_params = api_config["params"]
-            url = self.base_url + api_path
+        api_name = api_config["name"]
+        api_path = api_config["path"]
+        api_params = api_config["params"]
+        url = self.base_url + api_path
 
-            logger.info("[books] 请求知识库 api=%s", api_name)
-            try:
-                response = self._requestSession.get(url, params=api_params) if api_params else self._requestSession.get(url)
+        logger.info("[books] 请求知识库 api=%s", api_name)
+        try:
+            response = (
+                self._requestSession.get(url, params=api_params)
+                if api_params
+                else self._requestSession.get(url)
+            )
 
-                if response.status_code != 200:
-                    logger.warning("[books] 请求失败 api=%s status=%s", api_name, response.status_code)
-                    if has_next:
-                        continue
-                    response.raise_for_status()
+            if response.status_code != 200:
+                logger.warning(
+                    "[books] 请求失败 api=%s status=%s",
+                    api_name,
+                    response.status_code,
+                )
+                response.raise_for_status()
 
-                response_json = response.json()
-                if "data" not in response_json:
-                    logger.warning("[books] 响应缺少 data 字段 api=%s", api_name)
-                    if has_next:
-                        continue
-                    raise ValueError("响应JSON中缺少 data 字段")
+            response_json = response.json()
+            if "data" not in response_json:
+                logger.warning("[books] 响应缺少 data 字段 api=%s", api_name)
+                raise ValueError("响应JSON中缺少 data 字段")
 
-                books_data = self._extract_books_data(response_json["data"])
-                if books_data is None:
-                    logger.warning("[books] 响应数据结构无法识别 api=%s", api_name)
-                    if has_next:
-                        continue
-                    raise ValueError("无法识别的知识库数据结构")
+            books_data = self._extract_books_data(response_json["data"])
+            if books_data is None:
+                logger.warning("[books] 响应数据结构无法识别 api=%s", api_name)
+                raise ValueError("无法识别的知识库数据结构")
 
-                if not books_data:
-                    logger.warning("[books] 知识库列表为空 api=%s", api_name)
-                    if has_next:
-                        continue
-                    logger.info("[books] 所有 API 返回空列表")
-                    return []
+            if not books_data:
+                logger.warning("[books] 知识库列表为空 api=%s", api_name)
+                return []
 
-                books = self._parse_books(books_data, api_name)
-                logger.info("[books] 获取成功 api=%s count=%s", api_name, len(books))
-                return books
+            books = self._parse_books(books_data, api_name)
+            logger.info("[books] 获取成功 api=%s count=%s", api_name, len(books))
+            return books
 
-            except requests.exceptions.RequestException as exc:
-                logger.warning("[books] 网络请求异常 api=%s error=%s", api_name, exc)
-                if has_next:
-                    continue
-                logger.error("[books] 所有 API 请求都失败")
-                raise
-            except json.JSONDecodeError as exc:
-                logger.warning("[books] JSON 解析失败 api=%s error=%s", api_name, exc)
-                if has_next:
-                    continue
-                logger.error("[books] 所有 API 解析都失败")
-                raise
-            except Exception as exc:
-                logger.warning("[books] 处理异常 api=%s error=%s", api_name, exc)
-                if has_next:
-                    continue
-                logger.error("[books] 所有 API 都失败")
-                raise
-
-        logger.error("[books] 所有 API 尝试均失败")
-        return []
+        except requests.exceptions.RequestException as exc:
+            logger.error("[books] 网络请求异常 api=%s error=%s", api_name, exc)
+            raise
+        except json.JSONDecodeError as exc:
+            logger.error("[books] JSON 解析失败 api=%s error=%s", api_name, exc)
+            raise
+        except Exception as exc:
+            logger.error("[books] 处理异常 api=%s error=%s", api_name, exc)
+            raise
 
     async def docs(self, book: YuqueBook) -> list[YuqueDocs]:
         """
@@ -388,7 +398,9 @@ class Yuque:
         try:
             response = self._requestSession.get(url, params={"book_id": book.id})
             if response.status_code != 200:
-                logger.error("[docs] 获取失败 %s status=%s", context, response.status_code)
+                logger.error(
+                    "[docs] 获取失败 %s status=%s", context, response.status_code
+                )
                 response.raise_for_status()
 
             response_json = response.json()
@@ -401,7 +413,12 @@ class Yuque:
                 try:
                     docs.append(YuqueDocs(doc_data))
                 except Exception as exc:
-                    logger.warning("[docs] 解析文档失败 %s index=%s error=%s", context, idx + 1, exc)
+                    logger.warning(
+                        "[docs] 解析文档失败 %s index=%s error=%s",
+                        context,
+                        idx + 1,
+                        exc,
+                    )
 
             logger.info("[docs] 获取成功 %s count=%s", context, len(docs))
             return docs
@@ -409,7 +426,9 @@ class Yuque:
             logger.error("[docs] 获取文档列表异常 %s error=%s", context, exc)
             raise
 
-    async def docs_export(self, book: YuqueBook, doc: YuqueDocs, save_path: str, retry: int = 5) -> bool:
+    async def docs_export(
+        self, book: YuqueBook, doc: YuqueDocs, save_path: str, retry: int = 5
+    ) -> bool:
         """
         导出文档到本地
 
@@ -429,7 +448,13 @@ class Yuque:
         export_url = f"{self.base_url}/api/docs/{doc.id}/export"
 
         for attempt in range(1, retry + 1):
-            logger.info("[export] 发起导出请求 %s format=%s attempt=%s/%s", context, export_format, attempt, retry)
+            logger.info(
+                "[export] 发起导出请求 %s format=%s attempt=%s/%s",
+                context,
+                export_format,
+                attempt,
+                retry,
+            )
 
             try:
                 response = self._requestSession.post(
@@ -438,7 +463,13 @@ class Yuque:
                     headers=self._build_export_headers(),
                 )
             except Exception as exc:
-                logger.warning("[export] 请求异常 %s attempt=%s/%s error=%s", context, attempt, retry, exc)
+                logger.warning(
+                    "[export] 请求异常 %s attempt=%s/%s error=%s",
+                    context,
+                    attempt,
+                    retry,
+                    exc,
+                )
                 continue
 
             if response.status_code != 200:
@@ -450,26 +481,44 @@ class Yuque:
                     logger.warning("[export] 文档不存在，跳过导出 %s", context)
                     return False
 
-                logger.warning("[export] 导出请求失败 %s status=%s attempt=%s/%s",
-                               context, response.status_code, attempt, retry)
+                logger.warning(
+                    "[export] 导出请求失败 %s status=%s attempt=%s/%s",
+                    context,
+                    response.status_code,
+                    attempt,
+                    retry,
+                )
                 continue
 
             try:
                 response_data = response.json()
             except json.JSONDecodeError as exc:
-                logger.warning("[export] 导出响应 JSON 解析失败 %s attempt=%s/%s error=%s",
-                               context, attempt, retry, exc)
+                logger.warning(
+                    "[export] 导出响应 JSON 解析失败 %s attempt=%s/%s error=%s",
+                    context,
+                    attempt,
+                    retry,
+                    exc,
+                )
                 continue
 
             export_data = response_data.get("data")
             if not isinstance(export_data, dict):
-                logger.warning("[export] 导出响应缺少 data 字段 %s attempt=%s/%s",
-                               context, attempt, retry)
+                logger.warning(
+                    "[export] 导出响应缺少 data 字段 %s attempt=%s/%s",
+                    context,
+                    attempt,
+                    retry,
+                )
                 continue
 
             state = export_data.get("state")
             if state == "pending":
-                logger.info("[export] 文档导出处理中 %s wait=%ss", context, EXPORT_PENDING_WAIT_SECONDS)
+                logger.info(
+                    "[export] 文档导出处理中 %s wait=%ss",
+                    context,
+                    EXPORT_PENDING_WAIT_SECONDS,
+                )
                 await asyncio.sleep(EXPORT_PENDING_WAIT_SECONDS)
                 continue
 
@@ -479,43 +528,77 @@ class Yuque:
 
             download_url = export_data.get("url")
             if not download_url:
-                logger.warning("[export] 导出响应缺少下载链接 %s attempt=%s/%s",
-                               context, attempt, retry)
+                logger.warning(
+                    "[export] 导出响应缺少下载链接 %s attempt=%s/%s",
+                    context,
+                    attempt,
+                    retry,
+                )
                 continue
 
-            if download_url.startswith('/'):
+            if download_url.startswith("/"):
                 download_url = self.base_url + download_url
 
             try:
                 download_response = self._requestSession.get(download_url)
             except Exception as exc:
-                logger.warning("[export] 下载请求异常 %s attempt=%s/%s error=%s",
-                               context, attempt, retry, exc)
+                logger.warning(
+                    "[export] 下载请求异常 %s attempt=%s/%s error=%s",
+                    context,
+                    attempt,
+                    retry,
+                    exc,
+                )
                 continue
 
             if download_response.status_code == 422:
-                logger.info("[export] 下载资源未就绪 %s wait=%ss", context, EXPORT_PENDING_WAIT_SECONDS)
+                logger.info(
+                    "[export] 下载资源未就绪 %s wait=%ss",
+                    context,
+                    EXPORT_PENDING_WAIT_SECONDS,
+                )
                 await asyncio.sleep(EXPORT_PENDING_WAIT_SECONDS)
                 continue
 
             if download_response.status_code != 200:
-                logger.warning("[export] 下载失败 %s status=%s attempt=%s/%s",
-                               context, download_response.status_code, attempt, retry)
+                logger.warning(
+                    "[export] 下载失败 %s status=%s attempt=%s/%s",
+                    context,
+                    download_response.status_code,
+                    attempt,
+                    retry,
+                )
                 continue
 
             if export_format == "pdf":
-                saved = self._save_pdf_export(download_response.content, save_path, context)
+                saved = self._save_pdf_export(
+                    download_response.content, save_path, context
+                )
             else:
                 download_response.encoding = download_response.apparent_encoding
-                saved = await self._save_markdown_export(book, doc, download_response.text, save_path, context)
+                saved = await self._save_markdown_export(
+                    book, doc, download_response.text, save_path, context
+                )
 
             if saved:
-                logger.info("[export] 导出成功 %s format=%s path=%s", context, export_format, save_path)
+                logger.info(
+                    "[export] 导出成功 %s format=%s path=%s",
+                    context,
+                    export_format,
+                    save_path,
+                )
                 return True
 
-            logger.warning("[export] 文件保存失败，将重试 %s attempt=%s/%s", context, attempt, retry)
+            logger.warning(
+                "[export] 文件保存失败，将重试 %s attempt=%s/%s",
+                context,
+                attempt,
+                retry,
+            )
 
-        logger.error("[export] 导出失败，达到最大重试次数 %s retries=%s", context, retry)
+        logger.error(
+            "[export] 导出失败，达到最大重试次数 %s retries=%s", context, retry
+        )
         return False
 
     async def overview(self, book: YuqueBook, doc: YuqueDocs) -> YuqueDocDetail:
@@ -613,7 +696,9 @@ async def download_all():
 
                 await save_document_versions(versions)
             except Exception as exc:
-                logger.exception("[download] 处理知识库失败 %s error=%s", book_context, exc)
+                logger.exception(
+                    "[download] 处理知识库失败 %s error=%s", book_context, exc
+                )
 
         await save_document_versions(versions)
         logger.info(
@@ -628,6 +713,7 @@ async def download_all():
     except Exception as exc:
         logger.exception("[download] 下载过程中发生错误 error=%s", exc)
         return False
+
 
 # 文档版本记录相关函数
 
@@ -647,7 +733,9 @@ async def load_document_versions():
             with open(version_file, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as exc:
-            logger.error("[version] 加载版本文件失败 path=%s error=%s", version_file, exc)
+            logger.error(
+                "[version] 加载版本文件失败 path=%s error=%s", version_file, exc
+            )
     return {}
 
 
@@ -671,6 +759,7 @@ async def check_document_updates(book: YuqueBook, doc: YuqueDocs, versions: dict
     current_updated_at = current_version.get("updated_at", "")
     return doc.updated_at > current_updated_at
 
+
 async def update_document_version(versions, book: YuqueBook, doc: YuqueDocs):
     """更新文档版本信息"""
     doc_key = f"{book.id}_{doc.id}"
@@ -680,13 +769,18 @@ async def update_document_version(versions, book: YuqueBook, doc: YuqueDocs):
         "doc_id": doc.id,
         "doc_title": doc.title,
         "updated_at": doc.updated_at,
-        "last_check_time": datetime.datetime.now().isoformat()
+        "last_check_time": datetime.datetime.now().isoformat(),
     }
     return versions
 
 
-async def build_book_export_tasks(book: YuqueBook, docs: list[YuqueDocs], versions: dict,
-                                  save_base_path: str, export_format: str) -> tuple[list[tuple[YuqueDocs, str]], int]:
+async def build_book_export_tasks(
+    book: YuqueBook,
+    docs: list[YuqueDocs],
+    versions: dict,
+    save_base_path: str,
+    export_format: str,
+) -> tuple[list[tuple[YuqueDocs, str]], int]:
     """构建单个知识库的导出任务。"""
     export_tasks = []
     skip_count = 0
@@ -706,14 +800,17 @@ async def build_book_export_tasks(book: YuqueBook, docs: list[YuqueDocs], versio
             skip_count += 1
             continue
 
-        logger.info("[download] 文档有更新，准备重新下载 %s", format_doc_context(book, doc))
+        logger.info(
+            "[download] 文档有更新，准备重新下载 %s", format_doc_context(book, doc)
+        )
         export_tasks.append((doc, save_path))
 
     return export_tasks, skip_count
 
 
-async def export_book_docs(yuque: Yuque, book: YuqueBook,
-                           export_tasks: list[tuple[YuqueDocs, str]]) -> list:
+async def export_book_docs(
+    yuque: Yuque, book: YuqueBook, export_tasks: list[tuple[YuqueDocs, str]]
+) -> list:
     """并发导出单个知识库下的文档。"""
     if not export_tasks:
         return []
@@ -735,8 +832,12 @@ async def export_book_docs(yuque: Yuque, book: YuqueBook,
         return await asyncio.gather(*futures, return_exceptions=True)
 
 
-async def apply_export_results(book: YuqueBook, export_tasks: list[tuple[YuqueDocs, str]],
-                               results: list, versions: dict) -> tuple[dict, int, int]:
+async def apply_export_results(
+    book: YuqueBook,
+    export_tasks: list[tuple[YuqueDocs, str]],
+    results: list,
+    versions: dict,
+) -> tuple[dict, int, int]:
     """统计导出结果并更新版本信息。"""
     success_count = 0
     fail_count = 0
@@ -796,10 +897,14 @@ async def monitor_updates():
                         if not has_update:
                             continue
 
-                        save_path = build_doc_save_path(save_base_path, book, doc, export_format)
+                        save_path = build_doc_save_path(
+                            save_base_path, book, doc, export_format
+                        )
                         export_success = await yuque.docs_export(book, doc, save_path)
                         if export_success:
-                            versions = await update_document_version(versions, book, doc)
+                            versions = await update_document_version(
+                                versions, book, doc
+                            )
                             update_count += 1
                             logger.info("[monitor] 更新成功 %s", context)
                         else:
@@ -807,14 +912,24 @@ async def monitor_updates():
                             logger.warning("[monitor] 更新失败 %s", context)
                     except Exception as exc:
                         fail_count += 1
-                        logger.exception("[monitor] 处理文档失败 %s error=%s", format_doc_context(book, doc), exc)
+                        logger.exception(
+                            "[monitor] 处理文档失败 %s error=%s",
+                            format_doc_context(book, doc),
+                            exc,
+                        )
 
             except Exception as exc:
-                logger.exception("[monitor] 获取知识库文档失败 %s error=%s", book_context, exc)
+                logger.exception(
+                    "[monitor] 获取知识库文档失败 %s error=%s", book_context, exc
+                )
 
         await save_document_versions(versions)
-        logger.info("[monitor] 监控完成 updates=%s fail=%s at=%s",
-                    update_count, fail_count, datetime.datetime.now().isoformat())
+        logger.info(
+            "[monitor] 监控完成 updates=%s fail=%s at=%s",
+            update_count,
+            fail_count,
+            datetime.datetime.now().isoformat(),
+        )
         return True
 
     except Exception as exc:
@@ -833,7 +948,9 @@ async def download_and_monitor(interval_minutes=60):
         while True:
             try:
                 await monitor_updates()
-                logger.info("[monitor] 等待下次检查 interval_minutes=%s", interval_minutes)
+                logger.info(
+                    "[monitor] 等待下次检查 interval_minutes=%s", interval_minutes
+                )
                 await asyncio.sleep(interval_minutes * 60)
             except Exception as exc:
                 logger.error("[monitor] 监控循环异常 error=%s", exc)
